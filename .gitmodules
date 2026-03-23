@@ -1,12 +1,16 @@
 [submodule "FIAP.Payments"]
 	path = FIAP.Payments
 	url = https://github.com/LucianoDSMiranda/FIAP.Payments.git
+	branch = master
 [submodule "FIAP.Catalog"]
 	path = FIAP.Catalog
 	url = https://github.com/LucianoDSMiranda/FIAP.Catalog.git
+	branch = master
 [submodule "Notification"]
 	path = Notification
 	url = https://github.com/LeandroLeeh32/cloudgames-notifications-api.git
+	branch = main
 [submodule "User"]
 	path = User
 	url = https://github.com/LeandroLeeh32/cloudgames-users-api.git
+	branch = main
