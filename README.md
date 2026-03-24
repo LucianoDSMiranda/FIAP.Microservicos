@@ -58,14 +58,22 @@ Com o Kubernetes iniciado pela interface do Docker Desktop, aplique os arquivos 
 Entre na raiz de cada microserviço e execute:
 
 ```bash
-kubectl apply -f k8s/
+\User> kubectl apply -f k8s/
+\Notification> kubectl apply -f k8s/
+\FIAP.Catalog> kubectl apply -f k8s/
+\FIAP.Payments> kubectl apply -f k8s/
 ```
 
 Esse processo também deve ser feito no projeto raiz **FIAP.Microservicos**, responsável por iniciar serviços compartilhados, como o **RabbitMQ**.
 
+```bash
+\FIAP.Microservicos> kubectl apply -f k8s/
+```
+
 ## Acesso às APIs
 
 Atualmente, estamos utilizando `port-forward` para acessar as APIs que necessitam de interação.
+Para cada Microservicos que for usar o `port-forward` deverá ser aaberto um novo CMD.
 
 ### Users API
 
@@ -77,6 +85,27 @@ kubectl port-forward service/users-api-service 8083:80
 
 ```bash
 kubectl port-forward service/catalog-api-service 8080:80
+```
+
+### Rabbit - caso onde é necessario verificar a fila. 
+
+```bash
+kubectl port-forward service/rabbitmq-service 15672:15672
+```
+
+## Exemplo de como acessar o port-forward
+
+http://localhost:8080/index.html -- Catalog
+http://localhost:8083/index.html -- User
+http://localhost:15672/ -- RabbitMQ , Acesso: guest/guest
+
+
+## Verificando Logs de evento após a CRIAÇÃO e COMPRA
+
+Para verificar os LOGS de saida de criação de um novo USER e da COMPRA REALIZADA sendo sucesso ou não sucesso pode ser visto pelo comando
+
+```bash
+kubectl logs deployment/notifications-api
 ```
 
 ## Observações
