@@ -72,33 +72,75 @@ Esse processo também deve ser feito no projeto raiz **FIAP.Microservicos**, res
 
 ## Acesso às APIs
 
-Atualmente, estamos utilizando `port-forward` para acessar as APIs que necessitam de interação.
-Para cada Microservicos que for usar o `port-forward` deverá ser aaberto um novo CMD.
+Atualmente, o projeto utiliza o Kong API Gateway como ponto único de entrada para as requisições externas.
+
+O Kong é responsável por:
+
+- Receber todas as requisições externas
+- Validar o token JWT
+- Realizar o roteamento para os microserviços internos
+- Centralizar o acesso às APIs
+
+
+## Subindo o Kong Gateway
+
+Após subir os microserviços no Kubernetes, aplique a configuração do Kong:
+
+```bash
+\k8s\kong> kubectl apply -f kong.yaml
+```
+
+## Expondo o Kong Gateway
+
+Primeiramente, verifique os services disponíveis:
+
+```bash
+\k8s\kong> kubectl get svc
+```
+
+Após localizar o service do Kong, execute:
+
+```bash
+\k8s\kong> kubectl port-forward service/kong-service 8010:8000
+```
+
+## Endpoints disponíveis
 
 ### Users API
 
-```bash
-kubectl port-forward service/users-api-service 8083:80
+```text
+http://localhost:8010/users/index.html
 ```
 
 ### Catalog API
 
-```bash
-kubectl port-forward service/catalog-api-service 8080:80
+```text
+http://localhost:8010/catalog/index.html
 ```
 
-### Rabbit - caso onde é necessario verificar a fila. 
+Todas as requisições realizadas nesses endpoints passam obrigatoriamente pelo Kong Gateway.
+
+---
+
+## RabbitMQ Management
+
+Para acessar o painel administrativo do RabbitMQ:
 
 ```bash
 kubectl port-forward service/rabbitmq-service 15672:15672
 ```
 
-## Exemplo de como acessar o port-forward
+Acesso:
 
-http://localhost:8080/index.html -- Catalog
-http://localhost:8083/index.html -- User
-http://localhost:15672/ -- RabbitMQ , Acesso: guest/guest
+```text
+http://localhost:15672
+```
 
+Usuário/Senha:
+
+```text
+guest / guest
+```
 
 ## Verificando Logs de evento após a CRIAÇÃO e COMPRA
 
