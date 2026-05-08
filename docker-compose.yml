@@ -17,6 +17,36 @@ services:
       timeout: 5s
       retries: 10
 
+  mongo:
+    image: mongo:7
+    container_name: mongo
+    hostname: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - cloudgames-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    hostname: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - cloudgames-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   users-api:
     build:
       context: ./User
@@ -27,10 +57,18 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - cloudgames-network
     environment:
       - RABBITMQ_HOST=rabbitmq
+      - MongoSettings__ConnectionString=mongodb://mongo:27017
+      - MongoSettings__Database=cloudgames_users
+      - Redis__ConnectionString=redis:6379
+      - Redis__LogStream=cloudgames:logs
 
   notifications-api:
     build:
@@ -42,10 +80,14 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - cloudgames-network
     environment:
       - RABBITMQ_HOST=rabbitmq
+      - Redis__ConnectionString=redis:6379
+      - Redis__LogStream=cloudgames:logs
 
   payments-api:
     build:
@@ -57,10 +99,14 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - cloudgames-network
     environment:
       - RABBITMQ_HOST=rabbitmq
+      - Redis__ConnectionString=redis:6379
+      - Redis__LogStream=cloudgames:logs
 
   catalog-api:
     build:
@@ -72,11 +118,22 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - cloudgames-network
     environment:
       - RABBITMQ_HOST=rabbitmq
+      - MongoSettings__ConnectionString=mongodb://mongo:27017
+      - MongoSettings__Database=cloudgames_catalog
+      - Redis__ConnectionString=redis:6379
+      - Redis__LogStream=cloudgames:logs
 
 networks:
   cloudgames-network:
     driver: bridge
+
+volumes:
+  mongo-data:
