@@ -2,21 +2,36 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: kong-config
+
 data:
   config.yaml: |
     _format_version: "3.0"
 
+    consumers:
+      - username: anonymous
+
+      - username: cloudgames-user
+        jwt_secrets:
+          - key: cloudgames-key
+            secret: SUPER_SECRET_KEY_123456789_123456789
+
     services:
       - name: users-api
         url: http://users-api-service:80
+
         routes:
-          # rota principal
           - name: users-route
             paths:
               - /users
             strip_path: true
 
-          # rota extra para swagger.json
+            plugins:
+              - name: jwt
+                config:
+                  claims_to_verify:
+                    - exp
+                  anonymous: anonymous
+
           - name: users-swagger-route
             paths:
               - /swagger
@@ -24,11 +39,19 @@ data:
 
       - name: catalog-api
         url: http://catalog-api-service:80
+
         routes:
           - name: catalog-route
             paths:
               - /catalog
             strip_path: true
+
+            plugins:
+              - name: jwt
+                config:
+                  claims_to_verify:
+                    - exp
+                  anonymous: anonymous
 
           - name: catalog-swagger-route
             paths:
@@ -40,37 +63,50 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kong
+
 spec:
   replicas: 1
+
   selector:
     matchLabels:
       app: kong
+
   template:
     metadata:
       labels:
         app: kong
+
     spec:
       containers:
         - name: kong
           image: kong:3.6
+
           ports:
             - containerPort: 8000
             - containerPort: 8001
+
           env:
             - name: KONG_DATABASE
               value: "off"
+
             - name: KONG_DECLARATIVE_CONFIG
               value: /kong/config/config.yaml
+
             - name: KONG_PROXY_ACCESS_LOG
               value: /dev/stdout
+
             - name: KONG_ADMIN_ACCESS_LOG
               value: /dev/stdout
+
             - name: KONG_PROXY_ERROR_LOG
               value: /dev/stderr
+
             - name: KONG_ADMIN_ERROR_LOG
               value: /dev/stderr
+
             - name: KONG_ADMIN_LISTEN
               value: 0.0.0.0:8001
+
           volumeMounts:
             - name: kong-config-volume
               mountPath: /kong/config
@@ -85,14 +121,18 @@ apiVersion: v1
 kind: Service
 metadata:
   name: kong-service
+
 spec:
   selector:
     app: kong
+
   ports:
     - name: proxy
       port: 8000
       targetPort: 8000
+
     - name: admin
       port: 8001
       targetPort: 8001
+
   type: ClusterIP
