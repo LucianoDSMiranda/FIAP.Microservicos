@@ -9,151 +9,211 @@ Este repositório utiliza **submodules** para referenciar os microserviços, que
 
 ## Repositórios utilizados
 
-- **FIAP.Payments**
-- **FIAP.Catalog**
-- **cloudgames-notifications-api**
-- **cloudgames-users-api**
+| Submodule | Repositório | Tipo |
+|---|---|---|
+| `User/` | cloudgames-users-api | ASP.NET Core Web API |
+| `FIAP.Catalog/` | FIAP.Catalog | ASP.NET Core Web API |
+| `FIAP.Payments/` | FIAP.Payments | Worker Service (MassTransit Consumer) |
+| `Notification/` | cloudgames-notifications-api | **Azure Functions v4** (dotnet-isolated) |
 
-## Estrutura esperada
+> ⚠️ O serviço `Notification` foi migrado de Web API para **Azure Functions serverless**. Ele não expõe endpoints HTTP nem métricas Prometheus — consome eventos do RabbitMQ via trigger.
+
+## Estrutura de diretórios
 
 ```text
 FIAP.Microservicos/
-├── docker-compose.yml
+├── docker-compose.yml          # Orquestração completa (todos os serviços + infra)
+├── k8s-deploy.ps1              # Script de deploy Kubernetes (Windows)
+├── k8s-deploy.sh               # Script de deploy Kubernetes (Linux/Mac)
+├── k8s-portforward.ps1         # Script de port-forward para acesso local
 ├── README.md
 ├── FIAP.Payments/
 ├── FIAP.Catalog/
 ├── Notification/
 ├── User/
-└── k8s/
+├── k8s/                        # Manifests de infra compartilhada
+│   ├── mongo-*.yaml
+│   ├── rabbitmq-*.yaml
+│   ├── redis-*.yaml
+│   ├── monitoring/
+│   │   ├── prometheus-config.yaml
+│   │   ├── prometheus-deployment.yaml
+│   │   └── grafana-deployment.yaml
+│   └── kong/
+│       └── kong.yaml
+└── monitoring/
+    ├── prometheus.yml
+    └── grafana/
+        └── provisioning/
 ```
 
-## Persistência e observabilidade
+## Infraestrutura e observabilidade
 
 | Recurso | Tecnologia | Função |
 |---|---|---|
-| **MongoDB** | `mongo:7` | Banco principal dos serviços `User` (DB `cloudgames_users`) e `Catalog` (DB `cloudgames_catalog`). |
-| **Redis** | `redis:7-alpine` | Sink central de logs estruturados via Redis Stream `cloudgames:logs`. Todos os 4 microsserviços publicam logs via Serilog. |
-| **RabbitMQ** | `rabbitmq:3-management` | Mensageria entre os microsserviços (MassTransit). |
-| **Prometheus** | `prom/prometheus:latest` | Coleta métricas HTTP/runtime dos 4 microsserviços via endpoint `/metrics` (prometheus-net). |
-| **Grafana** | `grafana/grafana:latest` | Dashboards de métricas (Prometheus) e logs (Redis Streams via plugin `redis-datasource`). |
+| **MongoDB** | `mongo:7` | Banco principal dos serviços `User` (DB `cloudgames_users`) e `Catalog` (DB `cloudgames_catalog`) |
+| **Redis** | `redis:7-alpine` | Sink central de logs estruturados via Redis Stream `cloudgames:logs` |
+| **RabbitMQ** | `rabbitmq:3-management` | Mensageria entre os microsserviços (MassTransit) |
+| **Azurite** | `mcr.microsoft.com/azure-storage/azurite` | Emulador do Azure Storage — obrigatório para o runtime das Azure Functions |
+| **Prometheus** | `prom/prometheus:latest` | Coleta métricas de `users-api`, `catalog-api` e `payments-api` a cada 15s |
+| **Grafana** | `grafana/grafana:latest` | Dashboards de métricas (Prometheus) e logs (Redis Stream) |
+| **Kong** | `kong:3.6` | API Gateway — ponto único de entrada com autenticação JWT |
+
+## Pré-requisitos
+
+- Docker Desktop com **Kubernetes habilitado** (Settings → Kubernetes → Enable Kubernetes)
+- `kubectl` configurado e apontando para o contexto `docker-desktop`
 
 ## Clonando o projeto
-
-Como este repositório utiliza submodules, recomenda-se realizar o clone com o comando abaixo:
 
 ```bash
 git clone --recurse-submodules https://github.com/LucianoDSMiranda/FIAP.Microservicos.git
 ```
 
-## Pré-requisitos
-
-Para executar o projeto, é necessário ter instalado e configurado:
-
-* Docker Desktop
-* Kubernetes habilitado no Docker Desktop
-* `kubectl` configurado na máquina
-
-## Build do ambiente
-
-Após clonar o projeto, acesse a raiz do repositório e execute:
+Se já clonou sem submodules:
 
 ```bash
-docker compose build --no-cache
-docker pull rabbitmq:3-management
-docker pull mongo:7
-docker pull redis:7-alpine
+git submodule update --init --recursive
 ```
-
-## Subindo o ambiente no Kubernetes
-
-Com o Kubernetes iniciado pela interface do Docker Desktop, aplique os arquivos da pasta `k8s` de cada projeto.
-
-Entre na raiz de cada microserviço e execute:
-
-```bash
-\User> kubectl apply -f k8s/
-\Notification> kubectl apply -f k8s/
-\FIAP.Catalog> kubectl apply -f k8s/
-\FIAP.Payments> kubectl apply -f k8s/
-```
-
-Esse processo também deve ser feito no projeto raiz **FIAP.Microservicos**, responsável por iniciar serviços compartilhados (RabbitMQ, MongoDB, Redis):
-
-```bash
-\FIAP.Microservicos> kubectl apply -f k8s/
-```
-
-## Acesso às APIs
-
-Atualmente, o projeto utiliza o Kong API Gateway como ponto único de entrada para as requisições externas.
-
-O Kong é responsável por:
-
-- Receber todas as requisições externas
-- Validar o token JWT
-- Realizar o roteamento para os microserviços internos
-- Centralizar o acesso às APIs
-
-
-## Subindo o Kong Gateway
-
-Após subir os microserviços no Kubernetes, aplique a configuração do Kong:
-
-```bash
-\k8s\kong> kubectl apply -f kong.yaml
-```
-
-## Expondo o Kong Gateway
-
-Primeiramente, verifique os services disponíveis:
-
-```bash
-\k8s\kong> kubectl get svc
-```
-
-Após localizar o service do Kong, execute:
-
-```bash
-\k8s\kong> kubectl port-forward service/kong-service 8010:8000
-```
-
-## Endpoints disponíveis
-
-### Users API
-
-```text
-http://localhost:8010/users/index.html
-```
-
-### Catalog API
-
-```text
-http://localhost:8010/catalog/index.html
-```
-
-Todas as requisições realizadas nesses endpoints passam obrigatoriamente pelo Kong Gateway.
 
 ---
 
-## RabbitMQ Management
+## Docker Compose (desenvolvimento local)
 
-Para acessar o painel administrativo do RabbitMQ:
+Sobe todos os serviços com um único comando a partir da raiz:
 
 ```bash
-kubectl port-forward service/rabbitmq-service 15672:15672
+docker compose up --build
 ```
 
-Acesso:
+### Serviços e portas (Docker Compose)
 
-```text
-http://localhost:15672
+| Serviço | URL |
+|---|---|
+| Users API | http://localhost:5001 |
+| Notifications Functions | http://localhost:5002 |
+| Payments API | http://localhost:5003 |
+| Catalog API | http://localhost:5004 |
+| RabbitMQ Management | http://localhost:15672 (guest / guest) |
+| Prometheus | http://localhost:9090 |
+| Grafana | http://localhost:3000 (admin / admin) |
+
+---
+
+## Kubernetes (Docker Desktop)
+
+### Deploy completo — script automático
+
+O script cuida da ordem correta de criação, aguarda cada grupo de pods ficar `Ready` antes de avançar e abre os port-forwards automaticamente ao final.
+
+**Windows (PowerShell):**
+
+```powershell
+# Primeira execução: faz o build das imagens + deploy
+.\k8s-deploy.ps1 -BuildImages
+
+# Execuções seguintes (sem rebuild)
+.\k8s-deploy.ps1
+
+# Derrubar tudo
+.\k8s-deploy.ps1 -Down
 ```
 
-Usuário/Senha:
+**Linux / Mac:**
 
-```text
-guest / guest
+```bash
+chmod +x k8s-deploy.sh
+
+# Primeira execução
+./k8s-deploy.sh --build
+
+# Execuções seguintes
+./k8s-deploy.sh
+
+# Derrubar tudo
+./k8s-deploy.sh --down
 ```
+
+### Ordem de deploy (referência)
+
+O script aplica na seguinte sequência:
+
+1. Infra compartilhada: MongoDB → RabbitMQ → Redis
+2. Azurite (Azure Storage emulator — necessário para Notifications Functions)
+3. Monitoring: Prometheus → Grafana
+4. Microsserviços: Users → Catalog → Payments → Notifications
+5. Kong API Gateway
+
+### Imagens Docker esperadas
+
+| Imagem | Contexto de build |
+|---|---|
+| `fiapmicroservicos-users-api` | `./User` |
+| `fiapmicroservicos-catalog-api` | `./FIAP.Catalog` |
+| `fiapmicroservicos-payments-api` | `./FIAP.Payments` |
+| `fiapmicroservicos-notifications-functions` | `./Notification` |
+
+Para forçar rebuild sem cache de uma imagem específica:
+
+```powershell
+docker build --no-cache -t fiapmicroservicos-catalog-api ./FIAP.Catalog
+kubectl rollout restart deployment/catalog-api
+```
+
+---
+
+## Acessando os serviços no Kubernetes
+
+Como o Docker Desktop no Windows não encaminha NodePorts de forma confiável, usa-se `kubectl port-forward`. O script abre todas as conexões em background:
+
+```powershell
+.\k8s-portforward.ps1          # Abre todos os port-forwards
+.\k8s-portforward.ps1 -Stop    # Encerra todos
+```
+
+> Os port-forwards ficam ativos enquanto a sessão do PowerShell estiver aberta. Após um `kubectl rollout restart`, rode o script novamente para reestabelecer as conexões.
+
+### URLs de acesso (Kubernetes via port-forward)
+
+| Serviço | URL | Credenciais |
+|---|---|---|
+| **Kong API Gateway** | http://localhost:8000 | — |
+| Swagger Users | http://localhost:8000/users/ | — |
+| Swagger Catalog | http://localhost:8000/catalog/ | — |
+| RabbitMQ Management | http://localhost:15672 | guest / guest |
+| Prometheus | http://localhost:9090 | — |
+| Grafana | http://localhost:3000 | admin / admin |
+
+---
+
+## Kong API Gateway
+
+O Kong é o ponto único de entrada para as APIs. Todas as requisições passam por ele e são validadas com JWT.
+
+### Roteamento
+
+| Path Kong | Serviço destino | Autenticação |
+|---|---|---|
+| `/users/*` | users-api-service:80 | JWT (anônimo permitido) |
+| `/catalog/*` | catalog-api-service:80 | JWT (anônimo permitido) |
+
+### Autenticação JWT
+
+Para acessar endpoints protegidos via Swagger ou direto:
+
+1. Faça login em `POST /users/api/Auth/login`
+2. Copie o token retornado
+3. No Swagger, clique em **Authorize** e informe: `Bearer {token}`
+
+### Consumer configurado
+
+```
+username: cloudgames-user
+key: cloudgames-key
+secret: SUPER_SECRET_KEY_123456789_123456789
+```
+
+---
 
 ## MongoDB
 
@@ -164,92 +224,74 @@ kubectl port-forward service/mongo-service 27017:27017
 docker run --rm -it --network host mongo:7 mongosh mongodb://localhost:27017
 ```
 
-### Verificando dados
+### Consultando dados
 
 ```javascript
 // Usuários
 use cloudgames_users
 db.users.find().pretty()
 
-// Jogos / catálogo
+// Catálogo
 use cloudgames_catalog
 db.games.find().pretty()
 db.userGames.find().pretty()
 ```
 
+---
+
 ## Logs centralizados (Redis Stream)
 
-Todos os microsserviços publicam logs estruturados no Redis Stream `cloudgames:logs`. Cada entrada contém os campos `timestamp`, `level`, `service`, `message`, `template`, `properties` e `exception`.
+Todos os microsserviços (exceto Notifications Functions) publicam logs estruturados via Serilog no Redis Stream `cloudgames:logs`.
 
-### Inspecionando logs
+### Inspecionando logs via CLI
 
 ```bash
-kubectl port-forward service/redis-service 6379:6379
-
-# Total de entradas no stream
-docker run --rm --network host redis:7-alpine redis-cli -h localhost XLEN cloudgames:logs
-
-# Últimas 10 entradas (mais recentes primeiro)
+# Últimas 10 entradas
 docker run --rm --network host redis:7-alpine redis-cli -h localhost XREVRANGE cloudgames:logs + - COUNT 10
+
+# Total de entradas
+docker run --rm --network host redis:7-alpine redis-cli -h localhost XLEN cloudgames:logs
 ```
 
-> **Dica:** O `RedisInsight` (https://redis.com/redis-enterprise/redis-insight/) oferece interface gráfica para explorar streams.
+### Visualizando no Grafana
 
-## Métricas e dashboards (Prometheus + Grafana)
+Acesse http://localhost:3000 → Dashboards → **CloudGames - Overview**
 
-Cada microsserviço expõe métricas no endpoint `/metrics` (HTTP request rate, latência, status codes, GC, CPU, memória .NET). O Prometheus faz scrape a cada 15s e o Grafana mostra os dashboards.
+Datasources já provisionados: `Prometheus` (métricas) e `Redis` (logs).
 
-### Subindo no Docker Compose
+---
 
-```bash
-docker compose up -d prometheus grafana
-```
+## Métricas (Prometheus + Grafana)
 
-### Acessando
-
-- **Prometheus UI:** http://localhost:9090 (verifique `Status → Targets` — todos devem ficar `UP`)
-- **Grafana UI:** http://localhost:3000 — login `admin` / `admin`
-  - Dashboard pré-provisionado: `Dashboards → CloudGames → CloudGames - Overview`
-  - Datasources já configurados: `Prometheus` (métricas) e `Redis` (logs do stream)
-
-### Métricas relevantes expostas
+Cada microsserviço (exceto Notifications Functions) expõe métricas no endpoint `/metrics`.
 
 | Métrica | Significado |
 |---|---|
 | `http_requests_received_total` | Contador de requisições por código HTTP / método |
-| `http_request_duration_seconds` | Histograma de latência (use `histogram_quantile` para p95/p99) |
-| `http_requests_in_progress` | Requisições em andamento agora |
+| `http_request_duration_seconds` | Histograma de latência |
+| `http_requests_in_progress` | Requisições em andamento |
 | `dotnet_total_memory_bytes` | Tamanho do heap gerenciado |
 | `process_cpu_seconds_total` | CPU acumulado pelo processo |
 
-### Subindo no Kubernetes
+> ℹ️ O serviço `notifications-functions` **não expõe `/metrics`** pois é uma Azure Function — não utiliza `prometheus-net`.
+
+Verifique os targets ativos: http://localhost:9090 → Status → Targets
+
+---
+
+## Logs dos pods
 
 ```bash
-\FIAP.Microservicos> kubectl apply -f k8s/monitoring/
-```
-
-E expor:
-
-```bash
-kubectl port-forward service/prometheus-service 9090:9090
-kubectl port-forward service/grafana-service 3000:3000
+kubectl logs deployment/users-api
+kubectl logs deployment/catalog-api
+kubectl logs deployment/payments-api
+kubectl logs deployment/notifications-functions
 ```
 
 ---
 
-## Verificando Logs específicos via kubectl
+## Observações sobre a arquitetura
 
-Os logs também aparecem no `stdout` de cada pod (Serilog Console sink), úteis para debug local:
-
-```bash
-kubectl logs deployment/users-api
-kubectl logs deployment/notifications-api
-kubectl logs deployment/catalog-api
-kubectl logs deployment/payments-api
-```
-
-## Observações
-
-Após a inicialização do ambiente, os microserviços estarão disponíveis para uso conforme a necessidade de interação e testes.
-
-Para mais detalhes sobre cada serviço, consulte os respectivos arquivos `README.md` de cada repositório.
+- **Notifications** roda como **Azure Functions v4** (dotnet-isolated) e requer o **Azurite** como emulador do Azure Storage. Sem ele o runtime das Functions não inicializa.
+- O serviço de Notifications **não é uma Web API** — não possui Swagger, endpoints HTTP próprios nem métricas Prometheus. Ele consome eventos do RabbitMQ (`UserCreated`, `PaymentProcessed`) e envia e-mails simulados via `Console.WriteLine`.
+- O **Kong** usa `strip_path: true` — o prefixo `/users` ou `/catalog` é removido antes de encaminhar para o microsserviço. O Swagger de cada API usa caminho relativo e server URL dinâmica baseada no host da requisição.
