@@ -70,24 +70,41 @@ services:
       - Redis__ConnectionString=redis:6379
       - Redis__LogStream=cloudgames:logs
 
-  notifications-api:
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    container_name: azurite
+    hostname: azurite
+    ports:
+      - "10000:10000"
+      - "10001:10001"
+      - "10002:10002"
+    networks:
+      - cloudgames-network
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "10000"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  notifications-functions:
     build:
       context: ./Notification
-      dockerfile: /Dockerfile
-    container_name: notifications-api
+      dockerfile: Dockerfile
+    container_name: notifications-functions
     ports:
-      - "5002:8080"
+      - "5002:80"
     depends_on:
       rabbitmq:
         condition: service_healthy
-      redis:
+      azurite:
         condition: service_healthy
     networks:
       - cloudgames-network
     environment:
-      - RABBITMQ_HOST=rabbitmq
-      - Redis__ConnectionString=redis:6379
-      - Redis__LogStream=cloudgames:logs
+      - FUNCTIONS_WORKER_RUNTIME=dotnet-isolated
+      - AzureWebJobsStorage=DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OGDouqEgUl1s4Rt0mEKI4OdVNt6Eok4;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;
+      - RabbitMQConnection=amqp://guest:guest@rabbitmq:5672/
+      - WEBSITES_ENABLE_APP_SERVICE_STORAGE=false
 
   payments-api:
     build:

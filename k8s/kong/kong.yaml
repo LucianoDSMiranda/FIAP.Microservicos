@@ -32,11 +32,6 @@ data:
                     - exp
                   anonymous: anonymous
 
-          - name: users-swagger-route
-            paths:
-              - /swagger
-            strip_path: false
-
       - name: catalog-api
         url: http://catalog-api-service:80
 
@@ -52,11 +47,6 @@ data:
                   claims_to_verify:
                     - exp
                   anonymous: anonymous
-
-          - name: catalog-swagger-route
-            paths:
-              - /swagger
-            strip_path: false
 
 ---
 apiVersion: apps/v1
