@@ -110,6 +110,8 @@ services:
       - AzureWebJobsStorage=DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OGDouqEgUl1s4Rt0mEKI4OdVNt6Eok4;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;
       - RabbitMQConnection=amqp://guest:guest@rabbitmq:5672/
       - WEBSITES_ENABLE_APP_SERVICE_STORAGE=false
+      - Redis__ConnectionString=redis:6379
+      - Redis__LogStream=cloudgames:logs
 
   payments-api:
     build:

@@ -95,6 +95,37 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "id": 7,
+      "title": "Application Logs (cloudgames:logs)",
+      "type": "table",
+      "datasource": { "type": "redis-datasource", "uid": "redis" },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 24 },
+      "options": {
+        "sortBy": [{ "displayName": "timestamp", "desc": true }],
+        "footer": { "show": false }
+      },
+      "fieldConfig": {
+        "defaults": { "custom": { "width": 0 } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "timestamp" }, "properties": [{ "id": "custom.width", "value": 200 }] },
+          { "matcher": { "id": "byName", "options": "level"     }, "properties": [{ "id": "custom.width", "value": 90  }] },
+          { "matcher": { "id": "byName", "options": "service"   }, "properties": [{ "id": "custom.width", "value": 160 }] },
+          { "matcher": { "id": "byName", "options": "exception" }, "properties": [{ "id": "custom.width", "value": 0   }, { "id": "custom.displayName", "value": "" }] }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "redis-datasource", "uid": "redis" },
+          "command": "xrevrange",
+          "query": "cloudgames:logs",
+          "keyName": "cloudgames:logs",
+          "count": "100",
+          "type": "xrevrange"
+        }
+      ]
     }
   ]
 }
