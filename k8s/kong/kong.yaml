@@ -24,6 +24,7 @@ data:
             paths:
               - /users
             strip_path: true
+            preserve_host: true
 
             plugins:
               - name: jwt
@@ -40,6 +41,7 @@ data:
             paths:
               - /catalog
             strip_path: true
+            preserve_host: true
 
             plugins:
               - name: jwt
