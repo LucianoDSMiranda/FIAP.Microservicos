@@ -119,11 +119,10 @@ data:
             {
               "refId": "A",
               "datasource": { "type": "redis-datasource", "uid": "redis" },
+              "type": "redis",
               "command": "xrevrange",
-              "query": "cloudgames:logs",
               "keyName": "cloudgames:logs",
-              "count": "100",
-              "type": "xrevrange"
+              "count": 100
             }
           ]
         }
