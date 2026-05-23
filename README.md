@@ -76,30 +76,6 @@ Se já clonou sem submodules:
 git submodule update --init --recursive
 ```
 
----
-
-## Docker Compose (desenvolvimento local)
-
-Sobe todos os serviços com um único comando a partir da raiz:
-
-```bash
-docker compose up --build
-```
-
-### Serviços e portas (Docker Compose)
-
-| Serviço | URL |
-|---|---|
-| Users API | http://localhost:5001 |
-| Notifications Functions | http://localhost:5002 |
-| Payments API | http://localhost:5003 |
-| Catalog API | http://localhost:5004 |
-| RabbitMQ Management | http://localhost:15672 (guest / guest) |
-| Prometheus | http://localhost:9090 |
-| Grafana | http://localhost:3000 (admin / admin) |
-
----
-
 ## Kubernetes (Docker Desktop)
 
 ### Deploy completo — script automático
@@ -112,9 +88,6 @@ O script cuida da ordem correta de criação, aguarda cada grupo de pods ficar `
 # Primeira execução: faz o build das imagens + deploy
 .\k8s-deploy.ps1 -BuildImages
 
-# Execuções seguintes (sem rebuild)
-.\k8s-deploy.ps1
-
 # Derrubar tudo
 .\k8s-deploy.ps1 -Down
 ```
@@ -126,9 +99,6 @@ chmod +x k8s-deploy.sh
 
 # Primeira execução
 ./k8s-deploy.sh --build
-
-# Execuções seguintes
-./k8s-deploy.sh
 
 # Derrubar tudo
 ./k8s-deploy.sh --down
@@ -160,24 +130,13 @@ docker build --no-cache -t fiapmicroservicos-catalog-api ./FIAP.Catalog
 kubectl rollout restart deployment/catalog-api
 ```
 
----
-
-## Acessando os serviços no Kubernetes
-
-Como o Docker Desktop no Windows não encaminha NodePorts de forma confiável, usa-se `kubectl port-forward`. O script abre todas as conexões em background:
-
-```powershell
-.\k8s-portforward.ps1          # Abre todos os port-forwards
-.\k8s-portforward.ps1 -Stop    # Encerra todos
-```
-
-> Os port-forwards ficam ativos enquanto a sessão do PowerShell estiver aberta. Após um `kubectl rollout restart`, rode o script novamente para reestabelecer as conexões.
-
 ### URLs de acesso (Kubernetes via port-forward)
+#### Kong API Gateway
+
+O Kong é o ponto único de entrada para as APIs. Todas as requisições passam por ele e são validadas com JWT.
 
 | Serviço | URL | Credenciais |
 |---|---|---|
-| **Kong API Gateway** | http://localhost:8000 | — |
 | Swagger Users | http://localhost:8000/users/ | — |
 | Swagger Catalog | http://localhost:8000/catalog/ | — |
 | RabbitMQ Management | http://localhost:15672 | guest / guest |
@@ -186,72 +145,26 @@ Como o Docker Desktop no Windows não encaminha NodePorts de forma confiável, u
 
 ---
 
-## Kong API Gateway
-
-O Kong é o ponto único de entrada para as APIs. Todas as requisições passam por ele e são validadas com JWT.
-
-### Roteamento
-
-| Path Kong | Serviço destino | Autenticação |
-|---|---|---|
-| `/users/*` | users-api-service:80 | JWT (anônimo permitido) |
-| `/catalog/*` | catalog-api-service:80 | JWT (anônimo permitido) |
 
 ### Autenticação JWT
 
 Para acessar endpoints protegidos via Swagger ou direto:
 
 1. Faça login em `POST /users/api/Auth/login`
+user
+
+  "email": "admin@cloudgames.com",
+  "password": "Admin123!"
+
+
 2. Copie o token retornado
 3. No Swagger, clique em **Authorize** e informe: `Bearer {token}`
 
-### Consumer configurado
-
-```
-username: cloudgames-user
-key: cloudgames-key
-secret: SUPER_SECRET_KEY_123456789_123456789
-```
-
----
-
-## MongoDB
-
-### Acesso via shell
-
-```bash
-kubectl port-forward service/mongo-service 27017:27017
-docker run --rm -it --network host mongo:7 mongosh mongodb://localhost:27017
-```
-
-### Consultando dados
-
-```javascript
-// Usuários
-use cloudgames_users
-db.users.find().pretty()
-
-// Catálogo
-use cloudgames_catalog
-db.games.find().pretty()
-db.userGames.find().pretty()
-```
-
----
 
 ## Logs centralizados (Redis Stream)
 
-Todos os microsserviços (exceto Notifications Functions) publicam logs estruturados via Serilog no Redis Stream `cloudgames:logs`.
+Todos os microsserviços publicam logs estruturados via Serilog no Redis Stream `cloudgames:logs`.
 
-### Inspecionando logs via CLI
-
-```bash
-# Últimas 10 entradas
-docker run --rm --network host redis:7-alpine redis-cli -h localhost XREVRANGE cloudgames:logs + - COUNT 10
-
-# Total de entradas
-docker run --rm --network host redis:7-alpine redis-cli -h localhost XLEN cloudgames:logs
-```
 
 ### Visualizando no Grafana
 
@@ -265,33 +178,10 @@ Datasources já provisionados: `Prometheus` (métricas) e `Redis` (logs).
 
 Cada microsserviço (exceto Notifications Functions) expõe métricas no endpoint `/metrics`.
 
-| Métrica | Significado |
-|---|---|
-| `http_requests_received_total` | Contador de requisições por código HTTP / método |
-| `http_request_duration_seconds` | Histograma de latência |
-| `http_requests_in_progress` | Requisições em andamento |
-| `dotnet_total_memory_bytes` | Tamanho do heap gerenciado |
-| `process_cpu_seconds_total` | CPU acumulado pelo processo |
-
-> ℹ️ O serviço `notifications-functions` **não expõe `/metrics`** pois é uma Azure Function — não utiliza `prometheus-net`.
-
-Verifique os targets ativos: http://localhost:9090 → Status → Targets
-
----
-
-## Logs dos pods
-
-```bash
-kubectl logs deployment/users-api
-kubectl logs deployment/catalog-api
-kubectl logs deployment/payments-api
-kubectl logs deployment/notifications-functions
-```
-
 ---
 
 ## Observações sobre a arquitetura
 
 - **Notifications** roda como **Azure Functions v4** (dotnet-isolated) e requer o **Azurite** como emulador do Azure Storage. Sem ele o runtime das Functions não inicializa.
-- O serviço de Notifications **não é uma Web API** — não possui Swagger, endpoints HTTP próprios nem métricas Prometheus. Ele consome eventos do RabbitMQ (`UserCreated`, `PaymentProcessed`) e envia e-mails simulados via `Console.WriteLine`.
+- O serviço de Notifications **não é uma Web API** — não possui Swagger, endpoints HTTP próprios nem métricas Prometheus. Ele consome eventos do RabbitMQ (`UserCreated`, `PaymentProcessed`) e envia e-mails simulados via log.
 - O **Kong** usa `strip_path: true` — o prefixo `/users` ou `/catalog` é removido antes de encaminhar para o microsserviço. O Swagger de cada API usa caminho relativo e server URL dinâmica baseada no host da requisição.
