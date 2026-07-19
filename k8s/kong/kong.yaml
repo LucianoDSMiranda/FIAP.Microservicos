@@ -13,7 +13,9 @@ data:
       - username: cloudgames-user
         jwt_secrets:
           - key: cloudgames-key
-            secret: SUPER_SECRET_KEY_123456789_123456789
+            # Placeholder — preencha antes do apply com o MESMO valor de JWT_SECRET
+            # usado em users-secret e catalog-secret.
+            secret: CHANGE_ME_JWT_SECRET
 
     services:
       - name: users-api
@@ -118,13 +120,12 @@ spec:
   selector:
     app: kong
 
+  # Expõe apenas a porta proxy externamente (ponto de entrada da aplicação).
+  # A porta admin (8001) NÃO é publicada para evitar expor a Admin API do Kong
+  # na internet; use `kubectl port-forward deployment/kong 8001:8001` se precisar.
   ports:
     - name: proxy
       port: 8000
       targetPort: 8000
 
-    - name: admin
-      port: 8001
-      targetPort: 8001
-
-  type: ClusterIP
+  type: LoadBalancer

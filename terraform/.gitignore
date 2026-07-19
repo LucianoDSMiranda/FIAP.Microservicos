@@ -1,0 +1,10 @@
+# Estado e cache do Terraform — contêm dados sensíveis (kube_config, credenciais). NÃO commitar.
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json

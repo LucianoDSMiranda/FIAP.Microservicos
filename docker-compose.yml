@@ -52,6 +52,24 @@ services:
       timeout: 3s
       retries: 10
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    container_name: elasticsearch
+    hostname: elasticsearch
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    networks:
+      - cloudgames-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
   users-api:
     build:
       context: ./User
@@ -70,6 +88,9 @@ services:
       - cloudgames-network
     environment:
       - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_USERNAME=guest
+      - RABBITMQ_PASSWORD=guest
+      - JWT_SECRET=dev-local-jwt-secret-0123456789-0123456789
       - MongoSettings__ConnectionString=mongodb://mongo:27017
       - MongoSettings__Database=cloudgames_users
       - Redis__ConnectionString=redis:6379
@@ -129,6 +150,8 @@ services:
       - cloudgames-network
     environment:
       - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_USERNAME=guest
+      - RABBITMQ_PASSWORD=guest
       - Redis__ConnectionString=redis:6379
       - Redis__LogStream=cloudgames:logs
 
@@ -146,14 +169,20 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
     networks:
       - cloudgames-network
     environment:
       - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_USERNAME=guest
+      - RABBITMQ_PASSWORD=guest
+      - JWT_SECRET=dev-local-jwt-secret-0123456789-0123456789
       - MongoSettings__ConnectionString=mongodb://mongo:27017
       - MongoSettings__Database=cloudgames_catalog
       - Redis__ConnectionString=redis:6379
       - Redis__LogStream=cloudgames:logs
+      - Elasticsearch__Url=http://elasticsearch:9200
 
   prometheus:
     image: prom/prometheus:latest
