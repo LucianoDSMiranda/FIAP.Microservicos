@@ -8,9 +8,9 @@
 	branch = master
 [submodule "Notification"]
 	path = Notification
-	url = https://github.com/LeandroLeeh32/cloudgames-notifications-api.git
+	url = https://github.com/fiap-cloud-games-team/cloudgames-notifications-api.git
 	branch = main
 [submodule "User"]
 	path = User
-	url = https://github.com/LeandroLeeh32/cloudgames-users-api.git
+	url = https://github.com/fiap-cloud-games-team/cloudgames-users-api.git
 	branch = main
